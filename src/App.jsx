@@ -13,6 +13,41 @@ import img9 from './menu/icecream_9.png';
 import img10 from './menu/icecream_10.png';
 import img11 from './menu/icecream_11.png';
 
+// --- 로고 Import ---
+import logoText from './logo/logo_rollingspoon_text.svg';
+import logoFull from './logo/logo_rollingspoon_full.svg';
+
+// [추가됨] 성공 팝업 컴포넌트 (원본 코드 구조 유지를 위해 App 외부 정의)
+const SuccessModal = ({ onClose }) => (
+  <div style={{
+    position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+    backdropFilter: 'blur(5px)', backgroundColor: 'rgba(0,0,0,0.4)',
+    zIndex: 2000, display: 'flex', justifyContent: 'center', alignItems: 'center',
+    animation: 'fadeIn 0.3s ease-out'
+  }} onClick={onClose}>
+    <div style={{
+      backgroundColor: 'white', borderRadius: '32px', padding: '40px',
+      textAlign: 'center', maxWidth: '340px', width: '90%',
+      boxShadow: '0 20px 50px rgba(0,0,0,0.2)',
+      animation: 'modalPop 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
+    }} onClick={e => e.stopPropagation()}>
+      <div style={{ fontSize: '50px', marginBottom: '20px' }}>✅</div>
+      <h3 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '10px', color: '#333' }}>문의 접수 완료</h3>
+      <p style={{ color: '#666', lineHeight: '1.5', marginBottom: '30px', fontSize: '15px' }}>
+        성공적으로 전달되었습니다.<br/>
+        담당자가 확인 후 빠르게 연락드리겠습니다.
+      </p>
+      <button onClick={onClose} style={{
+        width: '100%', padding: '15px', borderRadius: '12px',
+        backgroundColor: '#D43F5E', color: 'white', border: 'none',
+        fontWeight: 'bold', fontSize: '16px', cursor: 'pointer'
+      }}>
+        확인
+      </button>
+    </div>
+  </div>
+);
+
 // 화면 크기 변경 감지 훅
 const useResponsive = () => {
   const [isMobile, setIsMobile] = useState(false);
@@ -35,8 +70,13 @@ const App = () => {
   const [activeSection, setActiveSection] = useState('home');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
-  // [NEW] 선택된 상품 상태 (팝업용)
+  // 선택된 상품 상태 (팝업용)
   const [selectedProduct, setSelectedProduct] = useState(null);
+
+  // [추가됨] 폼 데이터 및 전송 상태 관리
+  const [formData, setFormData] = useState({name: '', phone: '', message: ''});
+  const [isSuccessOpen, setIsSuccessOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // 스크롤 감지 및 네비게이션 활성화
   useEffect(() => {
@@ -62,14 +102,67 @@ const App = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // [NEW] 팝업 열기/닫기 시 백그라운드 스크롤 제어
+  // 팝업 열기/닫기 시 백그라운드 스크롤 제어
   useEffect(() => {
-    if (selectedProduct) {
+    if (selectedProduct || isSuccessOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
     }
-  }, [selectedProduct]);
+  }, [selectedProduct, isSuccessOpen]);
+
+  // [추가됨] 입력 핸들러
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+  };
+
+  // [추가됨] 디스코드 전송 핸들러
+  const sendToDiscord = async () => {
+    if (!formData.name || !formData.phone) {
+      alert("성함과 연락처를 모두 입력해주세요.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    // 전달해주신 URL 적용
+    const DISCORD_WEBHOOK_URL = "https://discordapp.com/api/webhooks/1454453006366933168/2mdOm0cbWDt_5QYy__KluLPva36DNCgXnFiI8CK_pgjvccvS-hT1x3bB2jYIg5t7YvQq";
+
+    const message = {
+      embeds: [{
+        title: "🍦 Rolling Spoon 가맹 문의 도착",
+        color: 13909854, // #D43F5E (Decimal)
+        fields: [
+          { name: "성함", value: formData.name, inline: true },
+          { name: "연락처", value: formData.phone, inline: true },
+          { name: "접수 시간", value: new Date().toLocaleString('ko-KR') },
+          { name: "문의 내용", value: formData.message || "내용 없음", inline: false }
+        ],
+        footer: { text: "Landing Page Inquiry" }
+      }]
+    };
+
+    try {
+      const response = await fetch(DISCORD_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(message),
+      });
+
+      if (response.ok) {
+        setIsSubmitting(false);
+        setIsSuccessOpen(true);
+        setFormData({ name: '', phone: '' });
+      } else {
+        throw new Error('전송 실패');
+      }
+    } catch (error) {
+      console.error(error);
+      alert("전송 중 오류가 발생했습니다.");
+      setIsSubmitting(false);
+    }
+  };
 
   const colors = {
     bg: '#F2EBD9',
@@ -208,7 +301,6 @@ const App = () => {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", Roboto, sans-serif',
       overflowX: 'hidden'
     },
-    // ... (기존 스타일 유지)
     nav: {
       position: 'fixed',
       top: isScrolled ? (isMobile ? '10px' : '20px') : '0',
@@ -363,17 +455,15 @@ const App = () => {
       gap: isMobile ? '40px' : '60px',
       marginBottom: '80px'
     },
-
-    // [NEW] Modal Styles
+    // Modal Styles
     modalOverlay: {
       position: 'fixed',
       top: 0,
       left: 0,
       width: '100%',
       height: '100%',
-      // 감성적인 블러 효과: 강한 블러 + 아주 옅은 딤 처리
       backdropFilter: 'blur(15px)', 
-      backgroundColor: 'rgba(242, 235, 217, 0.3)', // 배경색 톤의 옅은 오버레이
+      backgroundColor: 'rgba(242, 235, 217, 0.3)', 
       zIndex: 1000,
       display: 'flex',
       justifyContent: 'center',
@@ -390,7 +480,7 @@ const App = () => {
       overflowY: 'auto',
       display: 'flex',
       flexDirection: isMobile ? 'column' : 'row',
-      boxShadow: '0 25px 100px rgba(212, 63, 94, 0.15)', // 부드러운 컬러 그림자
+      boxShadow: '0 25px 100px rgba(212, 63, 94, 0.15)',
       position: 'relative',
       animation: 'modalPop 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
       border: '1px solid rgba(255,255,255,0.8)'
@@ -432,9 +522,17 @@ const App = () => {
     }
   };
 
+  const fontLoadStyle = `
+    @font-face {
+      font-family: 'Cafe24Ssurround';
+      src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2105@1.1/Cafe24Ssurround.woff') format('woff');
+    }
+  `;
+
   return (
     <div style={styles.container}>
       <style>{`
+        ${fontLoadStyle}
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&display=swap');
         body { margin: 0; }
         .hover-lift:hover { transform: translateY(-8px); box-shadow: 0 25px 50px rgba(0,0,0,0.08) !important; }
@@ -462,9 +560,8 @@ const App = () => {
       {/* Navigation */}
       <nav style={styles.nav}>
         <div style={styles.navInner}>
-          <div style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', zIndex: 101}} onClick={() => handleNavClick('home')}>
-             <div style={{width: '12px', height: '12px', borderRadius: '50%', background: colors.primary}}></div>
-             <span style={styles.logoText}>Rolling Spoon</span>
+          <div style={{display: 'flex', alignItems: 'center', cursor: 'pointer', zIndex: 101}} onClick={() => handleNavClick('home')}>
+             <img src={logoText} alt="Rolling Spoon" style={{ height: '30px', width: 'auto' }} />
           </div>
 
           <div style={styles.menuDesktop}>
@@ -517,20 +614,17 @@ const App = () => {
       <main>
         {/* --- SECTION: HERO --- */}
         <section id="home" style={styles.hero}>
-          <div className="fade-in" style={{ animationDelay: '0.1s' }}>
-            <span style={{ display: 'inline-block', padding: '8px 20px', borderRadius: '100px', fontSize: '13px', fontWeight: '700', border: `1px solid ${colors.primary}`, color: colors.primary, marginBottom: '25px', backgroundColor: 'rgba(212, 63, 94, 0.05)' }}>
-              Start 2025 Sugar-Free
-            </span>
-            <h1 style={styles.heroTitle}>
-              Sweetness, <br/>
-              <span style={{ fontStyle: 'italic', color: colors.primary }}>Reimagined.</span>
-            </h1>
-            <p style={{ fontSize: isMobile ? '16px' : '20px', opacity: 0.7, marginBottom: '50px', maxWidth: '600px', margin: '0 auto 50px', lineHeight: '1.6' }}>
-              0g Sugar, 100% Delight. <br/>
-              우리는 디저트의 새로운 기준을 만듭니다. 죄책감 없이 즐기세요.
-            </p>
-            <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
-              <button onClick={() => handleNavClick('menu')} style={styles.btn}>Explore Menu</button>
+          <div className="fade-in" style={{ animationDelay: '0.1s', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div style={{ marginBottom: '50px' }}>
+              <img 
+                src={logoFull} 
+                alt="Sweetness, Reimagined" 
+                style={{ 
+                  maxWidth: isMobile ? '80%' : '600px', 
+                  width: '100%', 
+                  height: 'auto' 
+                }} 
+              />
             </div>
           </div>
           <div style={{ position: 'absolute', top: '50%', left: '10%', width: '300px', height: '300px', background: 'radial-gradient(circle, #D43F5E 0%, transparent 70%)', opacity: 0.15, filter: 'blur(60px)', pointerEvents: 'none' }} />
@@ -539,7 +633,7 @@ const App = () => {
 
         <div className="marquee-container">
           <div className="marquee-content">
-            ROLLING SPOON • ZERO SUGAR • PREMIUM GELATO • NATURAL INGREDIENTS • ROLLING SPOON • ZERO SUGAR • PREMIUM GELATO • NATURAL INGREDIENTS •
+            ROLLING SPOON • ZERO SUGAR ADDED • PREMIUM GELATO • NATURAL INGREDIENTS • RICH FLAVOR • ROLLING SPOON • ZERO SUGAR • PREMIUM GELATO • NATURAL INGREDIENTS • RICH FLAVOR • ROLLING SPOON • ZERO SUGAR ADDED • PREMIUM GELATO • NATURAL INGREDIENTS • RICH FLAVOR
           </div>
         </div>
 
@@ -549,17 +643,16 @@ const App = () => {
             <div>
               <span style={{ fontSize: '14px', fontWeight: 'bold', color: colors.primary, letterSpacing: '2px', display: 'block', marginBottom: '10px' }}>OUR PHILOSOPHY</span>
               <h2 style={{ fontSize: isMobile ? '36px' : '52px', fontFamily: '"Playfair Display", serif', fontWeight: 'bold', lineHeight: '1.1' }}>
-                Sweetness, <br/> but <span style={{fontStyle:'italic', color: colors.primary}}>Better.</span>
+                NO SUGAR ADDED, <br/> <span style={{fontStyle:'italic', color: colors.primary}}>SWEET ADDED.</span>
               </h2>
             </div>
-            <p style={{ maxWidth: '400px', fontSize: '15px', lineHeight: '1.7', opacity: 0.7, marginBottom: isMobile ? '0' : '10px' }}>
-              우리는 단순한 디저트가 아닌, <br/>
-              당신의 건강한 일상을 위한 달콤한 휴식을 연구합니다.
+            <p style={{ maxWidth: '400px', fontSize: '25px', lineHeight: '1.7', opacity: 0.7, marginBottom: isMobile ? '0' : '10px' }}>
+              설탕은 빼고, <br/>
+              달콤함은 더했습니다.
             </p>
           </div>
           
           <div style={styles.bentoGrid}>
-            
             {/* Card 1: 0% Sugar */}
             <div className="hover-lift-img" style={{ 
               ...styles.bentoCard, 
@@ -770,6 +863,7 @@ const App = () => {
         </section>
 
         {/* --- SECTION: PARTNER (Franchise) --- */}
+        {/* [수정됨] 디스코드 연동 폼 적용 */}
         <section id="franchise" style={{ ...styles.section, marginTop: '50px' }}>
           <div style={{ backgroundColor: 'white', borderRadius: '40px', padding: isMobile ? '40px 20px' : '80px', boxShadow: '0 20px 40px rgba(0,0,0,0.05)', textAlign: 'center' }}>
             <h2 style={{ fontSize: isMobile ? '32px' : '40px', fontFamily: '"Playfair Display", serif', fontWeight: 'bold', marginBottom: '20px' }}>Business Partnership</h2>
@@ -777,19 +871,67 @@ const App = () => {
             <div style={{ maxWidth: '400px', margin: '0 auto', textAlign: 'left' }}>
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ fontSize: '13px', fontWeight: 'bold', color: colors.text, display: 'block', marginBottom: '8px' }}>Name</label>
-                <input type="text" style={styles.input} placeholder="성함을 입력해주세요" />
+                <input 
+                  type="text" 
+                  name="name" 
+                  value={formData.name} 
+                  onChange={handleInputChange} 
+                  style={styles.input} 
+                  placeholder="성함을 입력해주세요" 
+                />
               </div>
               <div style={{ marginBottom: '30px' }}>
                 <label style={{ fontSize: '13px', fontWeight: 'bold', color: colors.text, display: 'block', marginBottom: '8px' }}>Phone</label>
-                <input type="tel" style={styles.input} placeholder="연락처를 입력해주세요" />
+                <input 
+                  type="tel" 
+                  name="phone" 
+                  value={formData.phone} 
+                  onChange={handleInputChange} 
+                  style={styles.input} 
+                  placeholder="연락처를 입력해주세요" 
+                />
               </div>
-              <button style={{ ...styles.btn, width: '100%', fontSize: '16px', padding: '16px' }}>비지니스 문의하기</button>
+              
+              {/* [여기 추가] 문의 내용 입력창 (Textarea) */}
+              <div style={{ marginBottom: '30px' }}>
+                <label style={{ fontSize: '13px', fontWeight: 'bold', color: colors.text, display: 'block', marginBottom: '8px' }}>
+                  Message <span style={{fontWeight:'normal', color:'#999'}}>(Optional)</span>
+                </label>
+                <textarea 
+                  name="message" 
+                  value={formData.message} 
+                  onChange={handleInputChange} 
+                  maxLength={1000}
+                  style={{ 
+                    ...styles.input,       // 기존 인풋 스타일 상속
+                    height: '120px',       // 높이 조절
+                    resize: 'none',        // 사용자 임의 크기 조절 방지
+                    fontFamily: 'inherit'  // 폰트 상속
+                  }} 
+                  placeholder="문의 내용을 자유롭게 적어주세요 (최대 1,000자)" 
+                />
+              </div>
+              
+              <button 
+                onClick={sendToDiscord} 
+                disabled={isSubmitting} 
+                style={{ 
+                  ...styles.btn, 
+                  width: '100%', 
+                  fontSize: '16px', 
+                  padding: '16px',
+                  opacity: isSubmitting ? 0.7 : 1,
+                  cursor: isSubmitting ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {isSubmitting ? '전송 중...' : '비지니스 문의하기'}
+              </button>
             </div>
           </div>
         </section>
       </main>
 
-      {/* --- POPUP MODAL --- */}
+      {/* --- POPUP MODAL (Product) --- */}
       {selectedProduct && (
         <div style={styles.modalOverlay} onClick={closeModal}>
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
@@ -835,17 +977,20 @@ const App = () => {
               </p>
 
               <div style={{ marginTop: '40px', display: 'flex', gap: '15px' }}>
-                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', opacity: 0.6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', opacity: 0.6 }}>
                     <span>🥚 Free-Range Egg</span>
-                 </div>
-                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', opacity: 0.6 }}>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', opacity: 0.6 }}>
                     <span>🥛 Organic Milk</span>
-                 </div>
+                  </div>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* [추가됨] 성공 알림 팝업 렌더링 */}
+      {isSuccessOpen && <SuccessModal onClose={() => setIsSuccessOpen(false)} />}
 
       {/* Footer */}
       <footer style={{ backgroundColor: '#2A2A2A', color: 'white', padding: '80px 20px', marginTop: '100px' }}>
