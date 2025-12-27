@@ -1,0 +1,30 @@
+/* 전체 초기화 */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body, html {
+  width: 100%;
+  overflow-x: hidden; /* 가로 스크롤 방지 */
+  background-color: #F2EBD9; /* 배경색 */
+}
+
+/* #root가 화면 전체를 덮도록 설정 */
+#root {
+  width: 100%; 
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  /* align-items: center; <-- 이걸 켜면 모든 자식 요소(헤더, 섹션 등)가 가운데로 몰립니다. 
+     전체 레이아웃을 잡을 때는 보통 끄는 게 낫지만, 
+     main 태그 안에서 max-width를 잡고 있으니 켜두셔도 됩니다. 
+     단, 헤더가 100% 너비를 써야 한다면 끄는 게 좋습니다. */
+}
+
+main {
+  width: 100%;
+  /* max-width: 1400px;  <-- 여기서 너비 제한을 하면 좋습니다 */
+  /* margin: 0 auto;     <-- 중앙 정렬 */
+}
